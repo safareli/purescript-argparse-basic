@@ -14,6 +14,14 @@
   , "record"
   , "strings"
   , "transformers"
+  , "bifunctors"
+  , "control"
+  , "integers"
+  , "newtype"
+  , "numbers"
+  , "prelude"
+  , "tuples"
+  , "unfoldable"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

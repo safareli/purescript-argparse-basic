@@ -138,6 +138,10 @@ instance applyParser :: Apply ArgParser where
   apply (ArgParser h1 m1) (ArgParser h2 m2) =
     ArgParser (h1 <> h2) (m1 <*> m2)
 
+instance applicativeParser :: Applicative ArgParser where
+  pure x =
+    ArgParser (HelpArgs []) $ pure x
+
 instance semigroupHelp :: Semigroup ArgHelp where
   append = case _, _ of
     HelpArgs hs1, HelpArgs hs2 -> HelpArgs (hs1 <> hs2)
@@ -447,7 +451,7 @@ choose name parsers =
 -- |
 -- | ```purescript
 -- | example =
--- |   helpFlag *> fromRecord
+-- |   flagHelp *> fromRecord
 -- |     { ...
 -- |     }
 -- | ```
@@ -470,7 +474,7 @@ flagHelp = ArgParser help (ArgFold { step, done, saturated: true })
 -- |
 -- | ```purescript
 -- | example =
--- |   infoFlag [ "--version", "-v" ] "1.0.0"
+-- |   flagInfo [ "--version", "-v" ] "1.0.0"
 -- |     *> fromRecord { ... }
 -- | ```
 flagInfo :: Array String -> String -> String -> ArgParser Unit
