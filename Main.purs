@@ -5,7 +5,8 @@ import Prelude
 import ArgParse.Basic (ArgError, ArgParser)
 import ArgParse.Basic as A
 import Data.Either (Either, either)
-import Debug (spy)
+import Data.Generic.Rep (class Generic)
+import Data.Show.Generic (genericShow)
 import Effect (Effect)
 import Effect.Console (log)
 
@@ -16,24 +17,30 @@ data GitCommand
   | Commit {message :: String, body :: String, amend:: Boolean}
   | Stash StashSubCommand
 
+
+derive instance genericGitCommand :: Generic GitCommand _
+instance showGitCommand :: Show GitCommand where show = genericShow
+
 data StashSubCommand
   = StashDefault {message :: String}
   | StashPop
 
+derive instance genericStashSubCommand :: Generic StashSubCommand _
+instance showStashSubCommand :: Show StashSubCommand where show = genericShow
 
 parseStashSubCommand :: A.ArgParser StashSubCommand
 parseStashSubCommand = A.flagHelp *> (A.choose "stash" 
   [ A.command ["push"] "push to stash" do
       StashDefault <$> A.fromRecord { message : A.argument ["--message","-m"] "Stash message" } 
-    -- , A.command ["pop"] "Pop from stash" (pure StashPop)
+    , A.command ["pop"] "Pop from stash" (pure StashPop)
   ]) # (A.default (StashDefault {message: ""}))
 
 
-git :: ArgParser GitCommand
-git = 
+gitCommand :: ArgParser GitCommand
+gitCommand = 
   A.flagInfo [ "--version", "-v" ] "show version" "0.0.1" *>
   A.flagHelp *>
-  (A.choose "git" 
+  (A.choose "<command>" 
     [ A.command ["stash"] "stash changes" do
         Stash <$> parseStashSubCommand,
       A.command ["commit"] "commit changes" do
@@ -44,19 +51,61 @@ git =
           })
     ])
 
-y :: Array String -> Either ArgError GitCommand
-y i = A.parseArgs "git" "This is my git CLI example." git (i <> [])
+git :: Array String -> Either ArgError GitCommand
+git i = A.parseArgs "git" "This is my git CLI example." gitCommand (i <> [])
 
-k :: Array String -> String
-k = y >>> either A.printArgError (\x -> let _x = spy "res" x in "")
+debug :: Array String -> Effect Unit
+debug = git >>> either (A.printArgError >>> log) (show >>> log)
 
 
 main :: Effect Unit
 main = do
-  log (k [""]) -- help msg as expected
+  debug []
+  {-
+  git
+      Expected <command>.
+
+      This is my git CLI example.
+
+      --help,-h       Show this help message.
+      --version,-v    show version
+      
+      commit          commit changes
+      stash           stash changes
+  -}
   log "_____"
-  log (k ["commit -b=body -m=asd --amend"]) --expected to parse but fails
+  debug ["commit", "-b=body", "-m=asd", "--amend"]
+  -- (Commit { amend: true, body: "body", message: "asd" })
   log "_____"
-  log (k ["stash --help"]) -- expected to see help for subcommand but not shown
+  debug ["stash"]
+  -- (Stash (StashDefault { message: "" }))
   log "_____"
-  log (k ["stash push -m=bla"]) -- expected to parse but fails
+  debug ["stash", "pop"]
+  -- (Stash StashPop)
+  log "_____"
+  debug ["stash", "--help"]
+  {-
+  git stash
+      stash changes
+
+      --help,-h    Show this help message.
+      
+      pop          Pop from stash
+      push         push to stash
+  -}
+  log "_____"
+  debug ["commit", "--help"]
+  {-
+  git commit
+      Unexpected argument:
+          --help
+
+      commit changes
+
+      -a,--amend      a amend
+      -b,--body       a body
+      -m,--message    a message
+  -}
+  log "_____"
+  debug ["stash", "push", "-m=bla"]
+  -- (Stash (StashDefault { message: "bla" }))
